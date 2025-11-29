@@ -29,6 +29,7 @@ pyarrow>=10.0.0              # Parquet support
 pyarrow-jdbc>=1.0.0          # JDBC for database connectivity
 psycopg2-binary>=2.9.0       # PostgreSQL driver
 pymongo>=4.3.0               # MongoDB driver
+protobuf>=3.20.0             # Protocol Buffers serialization
 
 # Technical Analysis
 pandas-ta>=0.3.0             # Technical analysis indicators

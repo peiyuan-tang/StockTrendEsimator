@@ -232,6 +232,176 @@ class DatabaseSink(BaseSink):
             return False
 
 
+class ProtobufSink(BaseSink):
+    """Write events to Protocol Buffer (protobuf) format"""
+
+    def __init__(self, config: Dict[str, Any]):
+        super().__init__(config)
+        self.file_suffix = config.get('file_suffix', '.pb')
+        self.batch_records = config.get('batch_records', False)
+        
+        try:
+            from google.protobuf.json_format import MessageToJson, Parse
+            from data_pipeline.storage import events_pb2
+            self.events_pb2 = events_pb2
+            self.MessageToJson = MessageToJson
+            self.Parse = Parse
+        except ImportError as e:
+            self.logger.error(f"protobuf not installed. Install with: pip install protobuf")
+            raise
+
+    def _dict_to_protobuf(self, record: Dict[str, Any]):
+        """Convert dictionary record to appropriate protobuf message"""
+        data_type = record.get('data_type', 'unknown')
+        
+        try:
+            if data_type == 'financial_data':
+                msg = self.events_pb2.FinancialData()
+                msg.data_type = record.get('data_type', '')
+                msg.ticker = record.get('ticker', '')
+                msg.timestamp = record.get('timestamp', '')
+                msg.price = float(record.get('price', 0))
+                msg.open = float(record.get('open', 0))
+                msg.high = float(record.get('high', 0))
+                msg.low = float(record.get('low', 0))
+                msg.volume = int(record.get('volume', 0))
+                msg.market_cap = int(record.get('market_cap', 0)) if record.get('market_cap') else 0
+                msg.pe_ratio = float(record.get('pe_ratio', 0)) if record.get('pe_ratio') else 0
+                msg.dividend_yield = float(record.get('dividend_yield', 0)) if record.get('dividend_yield') else 0
+                msg.week_52_high = float(record.get('52_week_high', 0)) if record.get('52_week_high') else 0
+                msg.week_52_low = float(record.get('52_week_low', 0)) if record.get('52_week_low') else 0
+                return msg
+                
+            elif data_type == 'stock_movement':
+                msg = self.events_pb2.StockMovement()
+                msg.data_type = record.get('data_type', '')
+                msg.ticker = record.get('ticker', '')
+                msg.timestamp = record.get('timestamp', '')
+                msg.price = float(record.get('price', 0))
+                msg.price_change = float(record.get('price_change', 0)) if record.get('price_change') else 0
+                msg.price_change_percent = float(record.get('price_change_percent', 0)) if record.get('price_change_percent') else 0
+                msg.high_52week = float(record.get('high_52week', 0)) if record.get('high_52week') else 0
+                msg.low_52week = float(record.get('low_52week', 0)) if record.get('low_52week') else 0
+                msg.sma_20 = float(record.get('SMA_20', 0)) if record.get('SMA_20') else 0
+                msg.sma_50 = float(record.get('SMA_50', 0)) if record.get('SMA_50') else 0
+                msg.rsi = float(record.get('RSI', 0)) if record.get('RSI') else 0
+                msg.macd = float(record.get('MACD', 0)) if record.get('MACD') else 0
+                msg.macd_signal = float(record.get('MACD_Signal', 0)) if record.get('MACD_Signal') else 0
+                msg.volume = int(record.get('volume', 0))
+                return msg
+                
+            elif data_type == 'news':
+                msg = self.events_pb2.NewsData()
+                msg.data_type = record.get('data_type', '')
+                msg.ticker = record.get('ticker', '')
+                msg.headline = record.get('headline', '')
+                msg.summary = record.get('summary', '')
+                msg.source = record.get('source', '')
+                msg.url = record.get('url', '')
+                msg.timestamp = record.get('timestamp', '')
+                msg.sentiment_polarity = float(record.get('sentiment_polarity', 0)) if record.get('sentiment_polarity') else 0
+                msg.sentiment_subjectivity = float(record.get('sentiment_subjectivity', 0)) if record.get('sentiment_subjectivity') else 0
+                msg.published_date = record.get('published_date', '')
+                return msg
+                
+            elif data_type == 'macroeconomic_data':
+                msg = self.events_pb2.MacroeconomicData()
+                msg.data_type = record.get('data_type', '')
+                msg.indicator = record.get('indicator', '')
+                msg.symbol = record.get('symbol', '')
+                msg.value = float(record.get('value', 0))
+                msg.unit = record.get('unit', '')
+                msg.date = record.get('date', '')
+                msg.timestamp = record.get('timestamp', '')
+                msg.source = record.get('source', '')
+                return msg
+                
+            elif data_type == 'policy_data':
+                msg = self.events_pb2.PolicyData()
+                msg.data_type = record.get('data_type', '')
+                msg.event_type = record.get('event_type', '')
+                msg.title = record.get('title', '')
+                msg.description = record.get('description', '')
+                msg.date = record.get('date', '')
+                msg.timestamp = record.get('timestamp', '')
+                msg.impact_level = record.get('impact_level', '')
+                msg.source = record.get('source', '')
+                
+                # Add metadata as key-value pairs
+                if 'metadata' in record and isinstance(record['metadata'], dict):
+                    for key, value in record['metadata'].items():
+                        msg.metadata[key] = str(value)
+                
+                return msg
+            else:
+                # Generic event for unknown types
+                msg = self.events_pb2.Event()
+                msg.event_type = data_type
+                msg.timestamp = record.get('timestamp', '')
+                if 'headers' in record and isinstance(record['headers'], dict):
+                    for key, value in record['headers'].items():
+                        msg.headers[key] = str(value)
+                msg.body = json.dumps(record).encode('utf-8')
+                return msg
+                
+        except Exception as e:
+            logger.warning(f"Error converting record to protobuf: {str(e)}")
+            return None
+
+    def write(self, events: List[Dict[str, Any]]) -> bool:
+        """Write events to protobuf format"""
+        try:
+            directory = self._expand_path()
+            self._ensure_directory(directory)
+            
+            # Extract event bodies
+            data = [event.get('body', event) for event in events]
+            
+            timestamp = datetime.utcnow().strftime('%Y%m%d_%H%M%S')
+            filename = f"{self.file_prefix}{timestamp}{self.file_suffix}"
+            filepath = os.path.join(directory, filename)
+            
+            if self.batch_records:
+                # Write as batch
+                batch = self.events_pb2.DataBatch()
+                batch.batch_timestamp = datetime.utcnow().isoformat()
+                
+                for record in data:
+                    msg = self._dict_to_protobuf(record)
+                    if msg:
+                        data_type = record.get('data_type', '')
+                        if data_type == 'financial_data':
+                            batch.financial_data.append(msg)
+                        elif data_type == 'stock_movement':
+                            batch.stock_movements.append(msg)
+                        elif data_type == 'news':
+                            batch.news_data.append(msg)
+                        elif data_type == 'macroeconomic_data':
+                            batch.macro_data.append(msg)
+                        elif data_type == 'policy_data':
+                            batch.policy_data.append(msg)
+                
+                with open(filepath, 'wb') as f:
+                    f.write(batch.SerializeToString())
+            else:
+                # Write individual messages (delimited)
+                with open(filepath, 'wb') as f:
+                    for record in data:
+                        msg = self._dict_to_protobuf(record)
+                        if msg:
+                            # Write message length-delimited (protobuf convention)
+                            msg_bytes = msg.SerializeToString()
+                            f.write(len(msg_bytes).to_bytes(4, byteorder='big'))
+                            f.write(msg_bytes)
+            
+            logger.info(f"Wrote {len(events)} events to protobuf file {filepath}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error writing to protobuf sink: {str(e)}")
+            return False
+
+
 class SinkFactory:
     """Factory for creating sink instances"""
 
@@ -240,6 +410,7 @@ class SinkFactory:
         'parquet': ParquetSink,
         'csv': CSVSink,
         'database': DatabaseSink,
+        'protobuf': ProtobufSink,
     }
 
     @classmethod

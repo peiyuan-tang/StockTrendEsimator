@@ -314,5 +314,120 @@ class TestSinkFactory(unittest.TestCase):
             self.skipTest("Required packages not installed")
 
 
+class TestProtobufSink(unittest.TestCase):
+    """Test Protocol Buffer sink"""
+    
+    def setUp(self):
+        """Set up test fixtures"""
+        self.temp_dir = tempfile.mkdtemp()
+        self.config = {
+            'path': self.temp_dir,
+            'file_prefix': 'test_',
+            'file_suffix': '.pb',
+            'batch_records': False,
+        }
+    
+    def tearDown(self):
+        """Clean up"""
+        import shutil
+        shutil.rmtree(self.temp_dir, ignore_errors=True)
+    
+    def test_protobuf_sink_initialization(self):
+        """Test protobuf sink initialization"""
+        try:
+            from data_pipeline.storage.data_sink import ProtobufSink
+            
+            sink = ProtobufSink(self.config)
+            self.assertIsNotNone(sink)
+            self.assertEqual(sink.file_suffix, '.pb')
+        
+        except ImportError:
+            self.skipTest("protobuf not installed")
+    
+    def test_protobuf_sink_write(self):
+        """Test writing to protobuf sink"""
+        try:
+            from data_pipeline.storage.data_sink import ProtobufSink
+            
+            sink = ProtobufSink(self.config)
+            
+            events = [
+                {'body': {
+                    'data_type': 'financial_data',
+                    'ticker': 'AAPL',
+                    'timestamp': datetime.now().isoformat(),
+                    'price': 150.0,
+                    'open': 149.5,
+                    'high': 151.0,
+                    'low': 148.5,
+                    'volume': 1000000,
+                }}
+            ]
+            
+            result = sink.write(events)
+            self.assertTrue(result)
+        
+        except ImportError:
+            self.skipTest("protobuf not installed")
+    
+    def test_protobuf_sink_batch_mode(self):
+        """Test protobuf sink in batch mode"""
+        try:
+            from data_pipeline.storage.data_sink import ProtobufSink
+            
+            config = self.config.copy()
+            config['batch_records'] = True
+            
+            sink = ProtobufSink(config)
+            
+            events = [
+                {'body': {
+                    'data_type': 'financial_data',
+                    'ticker': 'AAPL',
+                    'timestamp': datetime.now().isoformat(),
+                    'price': 150.0,
+                }},
+                {'body': {
+                    'data_type': 'stock_movement',
+                    'ticker': 'MSFT',
+                    'timestamp': datetime.now().isoformat(),
+                    'price': 320.0,
+                    'rsi': 65.0,
+                }}
+            ]
+            
+            result = sink.write(events)
+            self.assertTrue(result)
+        
+        except ImportError:
+            self.skipTest("protobuf not installed")
+    
+    def test_protobuf_sink_file_creation(self):
+        """Test protobuf file is created"""
+        try:
+            from data_pipeline.storage.data_sink import ProtobufSink
+            
+            sink = ProtobufSink(self.config)
+            
+            events = [
+                {'body': {
+                    'data_type': 'financial_data',
+                    'ticker': 'GOOG',
+                    'timestamp': datetime.now().isoformat(),
+                    'price': 140.0,
+                }}
+            ]
+            
+            sink.write(events)
+            
+            # Verify file was created
+            files = os.listdir(self.temp_dir)
+            self.assertTrue(len(files) > 0)
+            self.assertTrue(any(f.endswith('.pb') for f in files))
+        
+        except ImportError:
+            self.skipTest("protobuf not installed")
+
+
 if __name__ == '__main__':
     unittest.main()

@@ -1,0 +1,97 @@
+syntax = "proto3";
+
+package stock_pipeline;
+
+// Financial data record
+message FinancialData {
+    string data_type = 1;
+    string ticker = 2;
+    string timestamp = 3;
+    double price = 4;
+    double open = 5;
+    double high = 6;
+    double low = 7;
+    int64 volume = 8;
+    int64 market_cap = 9;
+    double pe_ratio = 10;
+    double dividend_yield = 11;
+    double week_52_high = 12;
+    double week_52_low = 13;
+}
+
+// Stock movement data
+message StockMovement {
+    string data_type = 1;
+    string ticker = 2;
+    string timestamp = 3;
+    double price = 4;
+    double price_change = 5;
+    double price_change_percent = 6;
+    double high_52week = 7;
+    double low_52week = 8;
+    double sma_20 = 9;
+    double sma_50 = 10;
+    double rsi = 11;
+    double macd = 12;
+    double macd_signal = 13;
+    int64 volume = 14;
+}
+
+// News data record
+message NewsData {
+    string data_type = 1;
+    string ticker = 2;
+    string headline = 3;
+    string summary = 4;
+    string source = 5;
+    string url = 6;
+    string timestamp = 7;
+    double sentiment_polarity = 8;
+    double sentiment_subjectivity = 9;
+    string published_date = 10;
+}
+
+// Macroeconomic data
+message MacroeconomicData {
+    string data_type = 1;
+    string indicator = 2;
+    string symbol = 3;
+    double value = 4;
+    string unit = 5;
+    string date = 6;
+    string timestamp = 7;
+    string source = 8;
+}
+
+// Policy data record
+message PolicyData {
+    string data_type = 1;
+    string event_type = 2;
+    string title = 3;
+    string description = 4;
+    string date = 5;
+    string timestamp = 6;
+    string impact_level = 7;
+    string source = 8;
+    map<string, string> metadata = 9;
+}
+
+// Batch container for multiple records
+message DataBatch {
+    repeated FinancialData financial_data = 1;
+    repeated StockMovement stock_movements = 2;
+    repeated NewsData news_data = 3;
+    repeated MacroeconomicData macro_data = 4;
+    repeated PolicyData policy_data = 5;
+    string batch_timestamp = 6;
+    int32 batch_id = 7;
+}
+
+// Generic event wrapper
+message Event {
+    string event_type = 1;
+    string timestamp = 2;
+    map<string, string> headers = 3;
+    bytes body = 4;
+}
+
