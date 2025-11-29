@@ -1,0 +1,204 @@
+#!/usr/bin/env python3
+"""
+Flume configuration for offline data collection pipeline.
+Defines agents, sources, sinks, and channels for data collection.
+"""
+
+# Global configuration
+flume:
+  agent_name: stock_data_collector
+  log_level: INFO
+
+# Agents configuration
+agents:
+  # Raw Data Collection Agent
+  financial_data_agent:
+    sources:
+      - financial_api_source
+      - stock_movement_source
+      - news_source
+    channels:
+      - financial_channel
+      - movement_channel
+      - news_channel
+    sinks:
+      - financial_sink
+      - movement_sink
+      - news_sink
+
+  # Context Data Collection Agent
+  context_data_agent:
+    sources:
+      - macro_economic_source
+      - policy_source
+    channels:
+      - macro_channel
+      - policy_channel
+    sinks:
+      - macro_sink
+      - policy_sink
+
+# Source Configurations
+sources:
+  # Financial Data from APIs (Mag 7 stocks)
+  financial_api_source:
+    type: custom
+    class: FinancialDataSource
+    batch_size: 100
+    timeout: 30
+    retry_attempts: 3
+    ticker_list:
+      - AAPL
+      - MSFT
+      - GOOGL
+      - AMZN
+      - NVDA
+      - META
+      - TSLA
+
+  # Stock Movement Trends (S&P 500)
+  stock_movement_source:
+    type: custom
+    class: StockMovementSource
+    batch_size: 500
+    interval_minutes: 60
+    indices: ['SP500']
+    include_indicators:
+      - SMA_20
+      - SMA_50
+      - RSI
+      - MACD
+
+  # News Data (S&P 500)
+  news_source:
+    type: custom
+    class: NewsDataSource
+    batch_size: 50
+    news_sources:
+      - finnhub
+      - alpha_vantage
+      - newsapi
+    sentiment_analysis: true
+
+  # Macroeconomic Data (Mag 7)
+  macro_economic_source:
+    type: custom
+    class: MacroeconomicDataSource
+    batch_size: 10
+    update_frequency: 'daily'
+    indicators:
+      - interest_rate
+      - unemployment_rate
+      - gdp_growth
+      - inflation_rate
+      - fed_funds_rate
+
+  # Fiscal and Monetary Policy (Mag 7)
+  policy_source:
+    type: custom
+    class: PolicyDataSource
+    batch_size: 20
+    update_frequency: 'weekly'
+    data_types:
+      - policy_announcements
+      - fed_meeting_notes
+      - treasury_decisions
+      - economic_indicators_schedule
+
+# Channel Configurations
+channels:
+  financial_channel:
+    type: memory
+    capacity: 1000
+    transactionCapacity: 100
+
+  movement_channel:
+    type: file
+    checkpoint_dir: /var/data/checkpoint/movement
+    data_dir: /var/data/queue/movement
+    capacity: 5000
+
+  news_channel:
+    type: memory
+    capacity: 500
+    transactionCapacity: 50
+
+  macro_channel:
+    type: file
+    checkpoint_dir: /var/data/checkpoint/macro
+    data_dir: /var/data/queue/macro
+    capacity: 100
+
+  policy_channel:
+    type: file
+    checkpoint_dir: /var/data/checkpoint/policy
+    data_dir: /var/data/queue/policy
+    capacity: 200
+
+# Sink Configurations
+sinks:
+  # Financial Data Sink
+  financial_sink:
+    type: file
+    path: /data/raw/financial_data/%Y-%m-%d/
+    file_prefix: mag7_financial_
+    file_suffix: .parquet
+    batch_size: 100
+    format: parquet
+    compression: snappy
+
+  # Stock Movement Sink
+  movement_sink:
+    type: file
+    path: /data/raw/stock_movements/%Y-%m-%d/
+    file_prefix: sp500_trends_
+    file_suffix: .parquet
+    batch_size: 500
+    format: parquet
+    compression: snappy
+
+  # News Data Sink
+  news_sink:
+    type: file
+    path: /data/raw/news/%Y-%m-%d/
+    file_prefix: sp500_news_
+    file_suffix: .parquet
+    batch_size: 50
+    format: parquet
+    compression: snappy
+
+  # Macroeconomic Data Sink
+  macro_sink:
+    type: file
+    path: /data/context/macroeconomic/%Y-%m-%d/
+    file_prefix: macro_indicators_
+    file_suffix: .parquet
+    batch_size: 10
+    format: parquet
+    compression: gzip
+
+  # Policy Data Sink
+  policy_sink:
+    type: file
+    path: /data/context/policy/%Y-%m-%d/
+    file_prefix: policy_data_
+    file_suffix: .parquet
+    batch_size: 20
+    format: parquet
+    compression: gzip
+
+# Bindings (connect sources to channels to sinks)
+bindings:
+  financial_data_agent:
+    financial_api_source: financial_channel
+    stock_movement_source: movement_channel
+    news_source: news_channel
+    financial_channel: financial_sink
+    movement_channel: movement_sink
+    news_channel: news_sink
+
+  context_data_agent:
+    macro_economic_source: macro_channel
+    policy_source: policy_channel
+    macro_channel: macro_sink
+    policy_channel: policy_sink

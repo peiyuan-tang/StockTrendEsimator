@@ -1,0 +1,53 @@
+#!/usr/bin/env python3
+"""
+Dependencies and requirements for Stock Trend Estimator Data Pipeline
+"""
+
+# Core Dependencies
+pyyaml>=6.0                    # YAML configuration parsing
+python-daemon>=2.3.2          # Daemon process management
+
+# Flume Python Integration
+flume-ng-python>=1.9.0       # Flume Python SDK
+
+# Data Collection - Financial Data
+yfinance>=0.2.0              # Yahoo Finance API
+pandas>=1.5.0                # Data manipulation
+pandas-datareader>=0.10.0    # FRED and economic data
+alpha-vantage>=2.3.1         # Alpha Vantage API
+
+# Data Collection - News & Text
+finnhub-python>=1.3.0        # Finnhub API
+newsapi>=0.1.1               # NewsAPI integration
+requests>=2.28.0             # HTTP requests
+beautifulsoup4>=4.11.0       # Web scraping
+feedparser>=6.0.0            # RSS feed parsing
+textblob>=0.17.0             # Sentiment analysis
+
+# Data Storage
+pyarrow>=10.0.0              # Parquet support
+pyarrow-jdbc>=1.0.0          # JDBC for database connectivity
+psycopg2-binary>=2.9.0       # PostgreSQL driver
+pymongo>=4.3.0               # MongoDB driver
+
+# Technical Analysis
+pandas-ta>=0.3.0             # Technical analysis indicators
+ta-lib>=0.4.0                # Technical analysis library (optional)
+
+# Data Processing
+numpy>=1.23.0                # Numerical computing
+scipy>=1.9.0                 # Scientific computing
+
+# Logging and Monitoring
+python-json-logger>=2.0.4    # JSON logging
+
+# Development Tools (optional)
+pytest>=7.0.0                # Testing framework
+pytest-cov>=4.0.0            # Test coverage
+black>=22.0.0                # Code formatter
+pylint>=2.15.0               # Linter
+mypy>=0.990                  # Type checking
+
+# Documentation
+sphinx>=5.0.0                # Documentation generation
+sphinx-rtd-theme>=1.0.0      # ReadTheDocs theme
