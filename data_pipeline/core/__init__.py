@@ -6,9 +6,17 @@ Handles pipeline orchestration and task scheduling
 
 from data_pipeline.core.flume_server import StockDataCollector
 from data_pipeline.core.pipeline_scheduler import PipelineScheduler, CollectionScheduler
+from data_pipeline.core.training_data import (
+    TrainingDataProcessor,
+    StockDataTower,
+    ContextDataTower,
+)
 
 __all__ = [
     'StockDataCollector',
     'PipelineScheduler',
     'CollectionScheduler',
+    'TrainingDataProcessor',
+    'StockDataTower',
+    'ContextDataTower',
 ]
