@@ -161,65 +161,115 @@ class CollectionScheduler(PipelineScheduler):
         super().__init__()
         self.collection_configs = {}
 
-    def schedule_financial_collection(self, callback: Callable, interval_minutes: int = 60):
-        """Schedule financial data collection"""
+    def schedule_financial_collection(self, callback: Callable, day_of_week: int = 0, hour: int = 9, minute: int = 0):
+        """Schedule financial data collection (weekly)
+        
+        Args:
+            callback: Function to execute
+            day_of_week: Day of week (0=Monday, 6=Sunday, default=0/Monday)
+            hour: Hour of day (0-23, default=9 AM)
+            minute: Minute of hour (0-59, default=0)
+        """
         job_id = 'financial_data_collection'
-        self.add_interval_job(
+        self.add_cron_job(
             callback,
             job_id=job_id,
-            seconds=interval_minutes * 60
+            hour=hour,
+            minute=minute,
+            day_of_week=day_of_week
         )
         self.collection_configs[job_id] = {
             'data_type': 'financial_data',
             'stocks': 'Mag 7',
-            'interval_minutes': interval_minutes
+            'schedule': 'weekly',
+            'day_of_week': day_of_week,
+            'time': f'{hour:02d}:{minute:02d}'
         }
 
-    def schedule_movement_collection(self, callback: Callable, interval_minutes: int = 60):
-        """Schedule stock movement collection"""
+    def schedule_movement_collection(self, callback: Callable, day_of_week: int = 1, hour: int = 10, minute: int = 0):
+        """Schedule stock movement collection (weekly)
+        
+        Args:
+            callback: Function to execute
+            day_of_week: Day of week (0=Monday, 6=Sunday, default=1/Tuesday)
+            hour: Hour of day (0-23, default=10 AM)
+            minute: Minute of hour (0-59, default=0)
+        """
         job_id = 'movement_collection'
-        self.add_interval_job(
+        self.add_cron_job(
             callback,
             job_id=job_id,
-            seconds=interval_minutes * 60
+            hour=hour,
+            minute=minute,
+            day_of_week=day_of_week
         )
         self.collection_configs[job_id] = {
             'data_type': 'stock_movements',
             'stocks': 'S&P 500',
-            'interval_minutes': interval_minutes
+            'schedule': 'weekly',
+            'day_of_week': day_of_week,
+            'time': f'{hour:02d}:{minute:02d}'
         }
 
-    def schedule_news_collection(self, callback: Callable, interval_minutes: int = 60):
-        """Schedule news data collection"""
+    def schedule_news_collection(self, callback: Callable, day_of_week: int = 2, hour: int = 11, minute: int = 0):
+        """Schedule news data collection (weekly)
+        
+        Args:
+            callback: Function to execute
+            day_of_week: Day of week (0=Monday, 6=Sunday, default=2/Wednesday)
+            hour: Hour of day (0-23, default=11 AM)
+            minute: Minute of hour (0-59, default=0)
+        """
         job_id = 'news_collection'
-        self.add_interval_job(
+        self.add_cron_job(
             callback,
             job_id=job_id,
-            seconds=interval_minutes * 60
+            hour=hour,
+            minute=minute,
+            day_of_week=day_of_week
         )
         self.collection_configs[job_id] = {
             'data_type': 'news',
             'stocks': 'S&P 500',
-            'interval_minutes': interval_minutes
+            'schedule': 'weekly',
+            'day_of_week': day_of_week,
+            'time': f'{hour:02d}:{minute:02d}'
         }
 
-    def schedule_macro_collection(self, callback: Callable, hour: int = 9, minute: int = 0):
-        """Schedule macroeconomic data collection (daily at specific time)"""
+    def schedule_macro_collection(self, callback: Callable, day_of_week: int = 3, hour: int = 14, minute: int = 0):
+        """Schedule macroeconomic data collection (weekly at specific time)
+        
+        Args:
+            callback: Function to execute
+            day_of_week: Day of week (0=Monday, 6=Sunday, default=3/Thursday)
+            hour: Hour of day (0-23, default=14/2 PM)
+            minute: Minute of hour (0-59, default=0)
+        """
         job_id = 'macro_collection'
         self.add_cron_job(
             callback,
             job_id=job_id,
             hour=hour,
-            minute=minute
+            minute=minute,
+            day_of_week=day_of_week
         )
         self.collection_configs[job_id] = {
             'data_type': 'macroeconomic',
             'stocks': 'Mag 7',
-            'schedule': f'Daily at {hour:02d}:{minute:02d}'
+            'schedule': 'weekly',
+            'day_of_week': day_of_week,
+            'time': f'{hour:02d}:{minute:02d}'
         }
 
-    def schedule_policy_collection(self, callback: Callable, day_of_week: int = 0, hour: int = 9, minute: int = 0):
-        """Schedule policy data collection (weekly)"""
+    def schedule_policy_collection(self, callback: Callable, day_of_week: int = 4, hour: int = 15, minute: int = 30):
+        """Schedule policy data collection (weekly at specific time)
+        
+        Args:
+            callback: Function to execute
+            day_of_week: Day of week (0=Monday, 6=Sunday, default=4/Friday)
+            hour: Hour of day (0-23, default=15/3 PM)
+            minute: Minute of hour (0-59, default=30)
+        """
         job_id = 'policy_collection'
         self.add_cron_job(
             callback,
@@ -231,7 +281,9 @@ class CollectionScheduler(PipelineScheduler):
         self.collection_configs[job_id] = {
             'data_type': 'policy',
             'stocks': 'Mag 7',
-            'schedule': f'Weekly on day {day_of_week} at {hour:02d}:{minute:02d}'
+            'schedule': 'weekly',
+            'day_of_week': day_of_week,
+            'time': f'{hour:02d}:{minute:02d}'
         }
 
     def get_collection_status(self) -> Dict[str, Any]:

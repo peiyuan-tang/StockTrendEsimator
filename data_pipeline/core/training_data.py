@@ -1,450 +1,41 @@
 #!/usr/bin/env python3
 """
-Training Data Processor - Unifies and joins data from all sources
+Training Data Processor - Unified Weekly Data Loading
 
-Combines:
-1. Stock Data Tower: Financial data + Stock movements
-2. Context Data Tower: News + Macroeconomic + Policy data
+Combines all data sources into a single flattened dataset:
+- Stock data: Financial metrics + technical indicators (labeled: stock_*)
+- Market context: News sentiment (labeled: news_*)
+- Macro indicators: Economic data (labeled: macro_*)
+- Policy data: Policy announcements (labeled: policy_*)
 
-Generates unified training dataset for ML models
+All data normalized to weekly granularity for consistent training.
 """
 
 import logging
 import os
 from datetime import datetime, timedelta
-from typing import Dict, List, Any, Optional, Tuple
+from typing import Dict, List, Any, Optional
 from pathlib import Path
 import json
 import pandas as pd
-from abc import ABC, abstractmethod
 
 logger = logging.getLogger(__name__)
 
 
-class DataTower(ABC):
-    """Base class for data towers"""
-
-    def __init__(self, config: Dict[str, Any]):
-        """Initialize data tower"""
-        self.config = config
-        self.data_root = config.get('data_root', '/data')
-        self.logger = logging.getLogger(self.__class__.__name__)
-
-    @abstractmethod
-    def load_data(
-        self,
-        start_date: Optional[datetime] = None,
-        end_date: Optional[datetime] = None
-    ) -> pd.DataFrame:
-        """Load and process data for this tower"""
-        pass
-
-    @abstractmethod
-    def normalize_schema(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Normalize schema for joining"""
-        pass
-
-
-class StockDataTower(DataTower):
+class UnifiedTrainingDataProcessor:
     """
-    Stock Data Tower: Combines financial and technical indicator data
+    Unified processor that loads all data sources with consistent weekly granularity
     
-    Structure:
-    - ticker: Stock symbol (AAPL, MSFT, etc.)
-    - timestamp: Event timestamp
-    - price: Current stock price
-    - ohlc: Open, High, Low, Close
-    - volume: Trading volume
-    - market_cap: Market capitalization
-    - pe_ratio: P/E ratio
-    - dividend_yield: Dividend yield
-    - 52_week_high/low: 52-week range
-    - sma_20/50: Simple moving averages
-    - rsi: Relative strength index
-    - macd: MACD indicator
-    """
-
-    def load_data(
-        self,
-        start_date: Optional[datetime] = None,
-        end_date: Optional[datetime] = None,
-        tickers: Optional[List[str]] = None
-    ) -> pd.DataFrame:
-        """
-        Load financial and stock movement data
-        
-        Args:
-            start_date: Start date for data
-            end_date: End date for data
-            tickers: List of tickers to load (default: Mag 7)
-            
-        Returns:
-            DataFrame with stock data
-        """
-        if tickers is None:
-            tickers = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'TSLA']
-
-        # Load financial data
-        financial_df = self._load_financial_data(start_date, end_date, tickers)
-        self.logger.info(f"Loaded {len(financial_df)} financial records")
-
-        # Load stock movements (technical indicators)
-        movement_df = self._load_stock_movements(start_date, end_date)
-        self.logger.info(f"Loaded {len(movement_df)} movement records")
-
-        # Merge on ticker and timestamp (allowing for minor time mismatches)
-        merged_df = self._merge_data_frames(financial_df, movement_df)
-        self.logger.info(f"Merged stock data: {len(merged_df)} records")
-
-        return merged_df
-
-    def _load_financial_data(
-        self,
-        start_date: Optional[datetime],
-        end_date: Optional[datetime],
-        tickers: List[str]
-    ) -> pd.DataFrame:
-        """Load financial data files"""
-        data_dir = os.path.join(self.data_root, 'raw', 'financial_data')
-        
-        return self._load_json_files(
-            data_dir,
-            start_date,
-            end_date,
-            filter_tickers=tickers
-        )
-
-    def _load_stock_movements(
-        self,
-        start_date: Optional[datetime],
-        end_date: Optional[datetime]
-    ) -> pd.DataFrame:
-        """Load stock movement data with technical indicators"""
-        data_dir = os.path.join(self.data_root, 'raw', 'stock_movements')
-        
-        return self._load_json_files(data_dir, start_date, end_date)
-
-    def _load_json_files(
-        self,
-        data_dir: str,
-        start_date: Optional[datetime] = None,
-        end_date: Optional[datetime] = None,
-        filter_tickers: Optional[List[str]] = None
-    ) -> pd.DataFrame:
-        """Load and parse JSON files from directory"""
-        records = []
-        
-        if not os.path.exists(data_dir):
-            self.logger.warning(f"Data directory not found: {data_dir}")
-            return pd.DataFrame()
-
-        try:
-            for file in os.listdir(data_dir):
-                if not file.endswith('.json'):
-                    continue
-
-                file_path = os.path.join(data_dir, file)
-                
-                try:
-                    with open(file_path, 'r') as f:
-                        data = json.load(f)
-                        
-                        # Handle list of records
-                        if isinstance(data, list):
-                            records.extend(data)
-                        elif isinstance(data, dict):
-                            records.append(data)
-                            
-                except Exception as e:
-                    self.logger.warning(f"Error reading {file}: {str(e)}")
-
-        except Exception as e:
-            self.logger.error(f"Error loading files from {data_dir}: {str(e)}")
-
-        df = pd.DataFrame(records)
-        
-        # Filter by date range
-        if not df.empty and 'timestamp' in df.columns:
-            df['timestamp'] = pd.to_datetime(df['timestamp'])
-            if start_date:
-                df = df[df['timestamp'] >= start_date]
-            if end_date:
-                df = df[df['timestamp'] <= end_date]
-
-        # Filter by tickers if provided
-        if filter_tickers and 'ticker' in df.columns:
-            df = df[df['ticker'].isin(filter_tickers)]
-
-        return df
-
-    def _merge_data_frames(self, financial_df: pd.DataFrame, movement_df: pd.DataFrame) -> pd.DataFrame:
-        """
-        Merge financial and movement data
-        Joins on ticker and nearest timestamp
-        """
-        if financial_df.empty or movement_df.empty:
-            return financial_df if not financial_df.empty else movement_df
-
-        # Rename timestamp columns to distinguish during merge
-        financial_df = financial_df.copy()
-        movement_df = movement_df.copy()
-
-        financial_df.rename(columns={'timestamp': 'fin_timestamp'}, inplace=True)
-        movement_df.rename(columns={'timestamp': 'mov_timestamp'}, inplace=True)
-
-        # Merge on ticker with nearest timestamp (asof merge)
-        if 'ticker' in financial_df.columns and 'ticker' in movement_df.columns:
-            financial_df = financial_df.sort_values('fin_timestamp')
-            movement_df = movement_df.sort_values('mov_timestamp')
-            
-            merged = pd.merge_asof(
-                financial_df,
-                movement_df,
-                on=['ticker', 'fin_timestamp'],
-                by='ticker',
-                direction='nearest',
-                tolerance=pd.Timedelta(minutes=60)
-            )
-            
-            # Use financial timestamp as primary
-            merged['timestamp'] = merged['fin_timestamp']
-            merged = merged.drop(columns=['fin_timestamp', 'mov_timestamp'], errors='ignore')
-        else:
-            merged = financial_df.copy()
-
-        return merged
-
-    def normalize_schema(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Normalize stock data schema"""
-        normalized = df.copy()
-        
-        # Ensure required columns exist
-        required_columns = {
-            'ticker': str,
-            'timestamp': 'datetime64[ns]',
-            'price': float,
-            'volume': float,
-            'market_cap': float,
-        }
-
-        for col, dtype in required_columns.items():
-            if col not in normalized.columns:
-                normalized[col] = None
-            if dtype == float:
-                normalized[col] = pd.to_numeric(normalized[col], errors='coerce')
-            elif dtype == 'datetime64[ns]':
-                normalized[col] = pd.to_datetime(normalized[col], errors='coerce')
-
-        return normalized
-
-
-class ContextDataTower(DataTower):
-    """
-    Context Data Tower: Combines contextual information
-    
-    Structure:
-    - ticker: Stock symbol
-    - timestamp: Event timestamp
-    - news_sentiment: Sentiment polarity and subjectivity
-    - macro_indicators: Economic indicators
-    - policy_events: Policy announcements
-    """
-
-    def load_data(
-        self,
-        start_date: Optional[datetime] = None,
-        end_date: Optional[datetime] = None,
-        tickers: Optional[List[str]] = None
-    ) -> pd.DataFrame:
-        """
-        Load news, macroeconomic, and policy data
-        
-        Args:
-            start_date: Start date for data
-            end_date: End date for data
-            tickers: List of tickers to load
-            
-        Returns:
-            DataFrame with context data
-        """
-        # Load all context data sources
-        news_df = self._load_news_data(start_date, end_date, tickers)
-        self.logger.info(f"Loaded {len(news_df)} news records")
-
-        macro_df = self._load_macro_data(start_date, end_date)
-        self.logger.info(f"Loaded {len(macro_df)} macro records")
-
-        policy_df = self._load_policy_data(start_date, end_date)
-        self.logger.info(f"Loaded {len(policy_df)} policy records")
-
-        # Combine context sources
-        combined_df = self._combine_context_data(news_df, macro_df, policy_df)
-        self.logger.info(f"Combined context data: {len(combined_df)} records")
-
-        return combined_df
-
-    def _load_news_data(
-        self,
-        start_date: Optional[datetime],
-        end_date: Optional[datetime],
-        tickers: Optional[List[str]]
-    ) -> pd.DataFrame:
-        """Load news data with sentiment"""
-        data_dir = os.path.join(self.data_root, 'raw', 'news')
-        
-        df = self._load_json_files(data_dir, start_date, end_date)
-        
-        if not df.empty and tickers:
-            if 'ticker' in df.columns:
-                df = df[df['ticker'].isin(tickers)]
-
-        return df
-
-    def _load_macro_data(
-        self,
-        start_date: Optional[datetime],
-        end_date: Optional[datetime]
-    ) -> pd.DataFrame:
-        """Load macroeconomic data"""
-        data_dir = os.path.join(self.data_root, 'raw', 'macroeconomic_data')
-        
-        return self._load_json_files(data_dir, start_date, end_date)
-
-    def _load_policy_data(
-        self,
-        start_date: Optional[datetime],
-        end_date: Optional[datetime]
-    ) -> pd.DataFrame:
-        """Load policy announcements"""
-        data_dir = os.path.join(self.data_root, 'raw', 'policy_data')
-        
-        return self._load_json_files(data_dir, start_date, end_date)
-
-    def _load_json_files(
-        self,
-        data_dir: str,
-        start_date: Optional[datetime] = None,
-        end_date: Optional[datetime] = None
-    ) -> pd.DataFrame:
-        """Load and parse JSON files"""
-        records = []
-        
-        if not os.path.exists(data_dir):
-            self.logger.warning(f"Data directory not found: {data_dir}")
-            return pd.DataFrame()
-
-        try:
-            for file in os.listdir(data_dir):
-                if not file.endswith('.json'):
-                    continue
-
-                file_path = os.path.join(data_dir, file)
-                
-                try:
-                    with open(file_path, 'r') as f:
-                        data = json.load(f)
-                        
-                        if isinstance(data, list):
-                            records.extend(data)
-                        elif isinstance(data, dict):
-                            records.append(data)
-                            
-                except Exception as e:
-                    self.logger.warning(f"Error reading {file}: {str(e)}")
-
-        except Exception as e:
-            self.logger.error(f"Error loading files from {data_dir}: {str(e)}")
-
-        df = pd.DataFrame(records)
-        
-        # Filter by date range
-        if not df.empty and 'timestamp' in df.columns:
-            df['timestamp'] = pd.to_datetime(df['timestamp'])
-            if start_date:
-                df = df[df['timestamp'] >= start_date]
-            if end_date:
-                df = df[df['timestamp'] <= end_date]
-
-        return df
-
-    def _combine_context_data(
-        self,
-        news_df: pd.DataFrame,
-        macro_df: pd.DataFrame,
-        policy_df: pd.DataFrame
-    ) -> pd.DataFrame:
-        """Combine multiple context data sources"""
-        combined = pd.DataFrame()
-
-        # Add news data with prefix
-        if not news_df.empty:
-            news_df = news_df.copy()
-            news_cols = {col: f'news_{col}' for col in news_df.columns if col not in ['ticker', 'timestamp']}
-            news_df.rename(columns=news_cols, inplace=True)
-            combined = news_df
-
-        # Add macro data (typically doesn't have ticker)
-        if not macro_df.empty:
-            macro_df = macro_df.copy()
-            if 'ticker' not in macro_df.columns:
-                macro_df['ticker'] = 'MARKET'
-            
-            macro_cols = {col: f'macro_{col}' for col in macro_df.columns if col not in ['ticker', 'timestamp']}
-            macro_df.rename(columns=macro_cols, inplace=True)
-            
-            if combined.empty:
-                combined = macro_df
-            else:
-                combined = pd.merge(combined, macro_df, on=['ticker', 'timestamp'], how='outer')
-
-        # Add policy data (typically doesn't have ticker)
-        if not policy_df.empty:
-            policy_df = policy_df.copy()
-            if 'ticker' not in policy_df.columns:
-                policy_df['ticker'] = 'MARKET'
-            
-            policy_cols = {col: f'policy_{col}' for col in policy_df.columns if col not in ['ticker', 'timestamp']}
-            policy_df.rename(columns=policy_cols, inplace=True)
-            
-            if combined.empty:
-                combined = policy_df
-            else:
-                combined = pd.merge(combined, policy_df, on=['ticker', 'timestamp'], how='outer')
-
-        return combined
-
-    def normalize_schema(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Normalize context data schema"""
-        normalized = df.copy()
-        
-        # Ensure required columns exist
-        required_columns = {
-            'ticker': str,
-            'timestamp': 'datetime64[ns]',
-        }
-
-        for col, dtype in required_columns.items():
-            if col not in normalized.columns:
-                normalized[col] = None
-            if dtype == 'datetime64[ns]':
-                normalized[col] = pd.to_datetime(normalized[col], errors='coerce')
-
-        return normalized
-
-
-class TrainingDataProcessor:
-    """
-    Main processor that orchestrates data tower loading and joining
-    
-    Outputs unified training dataset with:
-    - Stock features (price, volume, technical indicators)
-    - Context features (news sentiment, macro indicators, policy)
-    - Aligned timestamps for time-series analysis
+    Features:
+    - Single data loading pipeline (no separate towers)
+    - Automatic source labeling via column prefixes
+    - Flattened output structure for direct ML use
+    - Weekly time alignment across all sources
     """
 
     def __init__(self, config: Dict[str, Any]):
         """
-        Initialize training data processor
+        Initialize unified training data processor
         
         Args:
             config: Configuration dictionary with keys:
@@ -456,10 +47,6 @@ class TrainingDataProcessor:
         self.data_root = config.get('data_root', '/data')
         self.output_format = config.get('output_format', 'parquet')
         self.output_path = config.get('output_path', os.path.join(self.data_root, 'training'))
-        
-        self.stock_tower = StockDataTower(config)
-        self.context_tower = ContextDataTower(config)
-        
         self.logger = logging.getLogger(__name__)
 
     def generate_training_data(
@@ -467,81 +54,431 @@ class TrainingDataProcessor:
         start_date: Optional[datetime] = None,
         end_date: Optional[datetime] = None,
         tickers: Optional[List[str]] = None,
-        save: bool = True
+        save: bool = True,
+        include_weekly_movement: bool = True
     ) -> pd.DataFrame:
         """
-        Generate unified training dataset
+        Generate unified flattened training dataset
+        
+        All data is normalized to weekly granularity with source labels:
+        - stock_*: Financial data + technical indicators
+        - news_*: News sentiment data
+        - macro_*: Macroeconomic indicators
+        - policy_*: Policy announcements
         
         Args:
-            start_date: Start date for data (default: 30 days ago)
+            start_date: Start date for data (default: 12 weeks ago)
             end_date: End date for data (default: today)
             tickers: List of tickers (default: Mag 7)
             save: Whether to save the output
+            include_weekly_movement: Whether to calculate weekly movement deltas (default: True)
             
         Returns:
-            DataFrame with training data
+            Flattened DataFrame with all features
         """
-        # Set default date range
+        # Set default date range - 12 weeks (84 days) for adequate weekly data
         if end_date is None:
             end_date = datetime.utcnow()
         if start_date is None:
-            start_date = end_date - timedelta(days=30)
+            start_date = end_date - timedelta(days=84)
 
         if tickers is None:
             tickers = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'TSLA']
 
         self.logger.info(
-            f"Generating training data for {len(tickers)} tickers "
+            f"Generating unified training data for {len(tickers)} tickers "
             f"from {start_date.date()} to {end_date.date()}"
         )
 
-        # Load data from both towers
-        stock_data = self.stock_tower.load_data(start_date, end_date, tickers)
-        stock_data = self.stock_tower.normalize_schema(stock_data)
-        
-        context_data = self.context_tower.load_data(start_date, end_date, tickers)
-        context_data = self.context_tower.normalize_schema(context_data)
+        # Load all data sources with unified weekly granularity
+        stock_data = self._load_stock_data(start_date, end_date, tickers)
+        news_data = self._load_news_data(start_date, end_date, tickers)
+        macro_data = self._load_macro_data(start_date, end_date)
+        policy_data = self._load_policy_data(start_date, end_date)
 
-        # Join stock and context data
-        training_data = self._join_towers(stock_data, context_data)
+        # Join all data on ticker and weekly timestamp
+        training_data = self._join_all_sources(stock_data, news_data, macro_data, policy_data)
 
-        self.logger.info(f"Generated training data with {len(training_data)} rows and {len(training_data.columns)} columns")
+        # Add weekly movement calculations if requested
+        if include_weekly_movement and not training_data.empty:
+            training_data = self._add_weekly_movement(training_data)
+
+        self.logger.info(
+            f"Generated unified training data: {len(training_data)} rows, "
+            f"{len(training_data.columns)} columns"
+        )
 
         # Save if requested
-        if save:
+        if save and not training_data.empty:
             self._save_training_data(training_data)
 
         return training_data
 
-    def _join_towers(self, stock_df: pd.DataFrame, context_df: pd.DataFrame) -> pd.DataFrame:
+    def _load_stock_data(
+        self,
+        start_date: datetime,
+        end_date: datetime,
+        tickers: List[str]
+    ) -> pd.DataFrame:
         """
-        Join stock and context data towers
+        Load and normalize stock data (financial + technical indicators)
         
-        Performs outer join to preserve all records from both sources
+        Sources:
+        - Financial metrics: price, volume, market cap, P/E ratio, etc.
+        - Technical indicators: SMA, RSI, MACD, etc.
+        
+        Returns DataFrame with columns prefixed by 'stock_'
         """
-        if stock_df.empty and context_df.empty:
-            self.logger.warning("Both data towers are empty")
-            return pd.DataFrame()
+        # Load financial data
+        financial_df = self._load_json_files(
+            os.path.join(self.data_root, 'raw', 'financial_data'),
+            start_date, end_date,
+            filter_tickers=tickers
+        )
+        self.logger.info(f"Loaded {len(financial_df)} financial records")
 
-        if stock_df.empty:
-            return context_df
-        if context_df.empty:
-            return stock_df
+        # Load stock movements (technical indicators)
+        movement_df = self._load_json_files(
+            os.path.join(self.data_root, 'raw', 'stock_movements'),
+            start_date, end_date
+        )
+        self.logger.info(f"Loaded {len(movement_df)} movement records")
 
-        # Join on ticker and timestamp
-        merged = pd.merge(
-            stock_df,
-            context_df,
-            on=['ticker', 'timestamp'],
-            how='outer'
+        # Merge financial and movement data
+        if not financial_df.empty and not movement_df.empty:
+            stock_df = pd.merge(
+                financial_df,
+                movement_df,
+                on=['ticker', 'timestamp'],
+                how='outer'
+            )
+        elif not financial_df.empty:
+            stock_df = financial_df.copy()
+        elif not movement_df.empty:
+            stock_df = movement_df.copy()
+        else:
+            stock_df = pd.DataFrame()
+
+        # Add source label prefix to all stock columns except key fields
+        if not stock_df.empty:
+            stock_df = self._prefix_columns(stock_df, 'stock_', exclude=['ticker', 'timestamp'])
+            self.logger.info(f"Stock data: {len(stock_df)} records after labeling")
+
+        return stock_df
+
+    def _load_news_data(
+        self,
+        start_date: datetime,
+        end_date: datetime,
+        tickers: List[str]
+    ) -> pd.DataFrame:
+        """
+        Load and normalize news data with sentiment
+        
+        Returns DataFrame with columns prefixed by 'news_'
+        """
+        news_df = self._load_json_files(
+            os.path.join(self.data_root, 'raw', 'news'),
+            start_date, end_date
         )
 
-        # Sort by ticker and timestamp
-        merged = merged.sort_values(['ticker', 'timestamp']).reset_index(drop=True)
+        # Filter by tickers if provided
+        if not news_df.empty and tickers and 'ticker' in news_df.columns:
+            news_df = news_df[news_df['ticker'].isin(tickers)].copy()
 
-        self.logger.info(f"Joined towers: {len(merged)} records")
+        self.logger.info(f"Loaded {len(news_df)} news records")
 
-        return merged
+        # Add source label prefix
+        if not news_df.empty:
+            news_df = self._prefix_columns(news_df, 'news_', exclude=['ticker', 'timestamp'])
+
+        return news_df
+
+    def _load_macro_data(
+        self,
+        start_date: datetime,
+        end_date: datetime
+    ) -> pd.DataFrame:
+        """
+        Load and normalize macroeconomic indicators
+        
+        Returns DataFrame with columns prefixed by 'macro_'
+        """
+        macro_df = self._load_json_files(
+            os.path.join(self.data_root, 'context', 'macroeconomic'),
+            start_date, end_date
+        )
+
+        self.logger.info(f"Loaded {len(macro_df)} macro records")
+
+        # Ensure ticker column exists (macro data typically doesn't have ticker)
+        if not macro_df.empty:
+            if 'ticker' not in macro_df.columns:
+                macro_df['ticker'] = 'MARKET'
+            
+            # Add source label prefix
+            macro_df = self._prefix_columns(macro_df, 'macro_', exclude=['ticker', 'timestamp'])
+
+        return macro_df
+
+    def _load_policy_data(
+        self,
+        start_date: datetime,
+        end_date: datetime
+    ) -> pd.DataFrame:
+        """
+        Load and normalize policy announcements
+        
+        Returns DataFrame with columns prefixed by 'policy_'
+        """
+        policy_df = self._load_json_files(
+            os.path.join(self.data_root, 'context', 'policy'),
+            start_date, end_date
+        )
+
+        self.logger.info(f"Loaded {len(policy_df)} policy records")
+
+        # Ensure ticker column exists (policy data typically doesn't have ticker)
+        if not policy_df.empty:
+            if 'ticker' not in policy_df.columns:
+                policy_df['ticker'] = 'MARKET'
+            
+            # Add source label prefix
+            policy_df = self._prefix_columns(policy_df, 'policy_', exclude=['ticker', 'timestamp'])
+
+        return policy_df
+
+    def _load_json_files(
+        self,
+        data_dir: str,
+        start_date: datetime,
+        end_date: datetime,
+        filter_tickers: Optional[List[str]] = None
+    ) -> pd.DataFrame:
+        """Load and parse JSON files from directory with date filtering"""
+        records = []
+        
+        if not os.path.exists(data_dir):
+            self.logger.debug(f"Data directory not found: {data_dir}")
+            return pd.DataFrame()
+
+        try:
+            for file in os.listdir(data_dir):
+                if not file.endswith('.json'):
+                    continue
+
+                file_path = os.path.join(data_dir, file)
+                
+                try:
+                    with open(file_path, 'r') as f:
+                        data = json.load(f)
+                        
+                        if isinstance(data, list):
+                            records.extend(data)
+                        elif isinstance(data, dict):
+                            records.append(data)
+                            
+                except Exception as e:
+                    self.logger.debug(f"Error reading {file}: {str(e)}")
+
+        except Exception as e:
+            self.logger.error(f"Error loading files from {data_dir}: {str(e)}")
+
+        if not records:
+            return pd.DataFrame()
+
+        df = pd.DataFrame(records)
+        
+        # Ensure timestamp is datetime
+        if 'timestamp' in df.columns:
+            df['timestamp'] = pd.to_datetime(df['timestamp'], errors='coerce')
+        
+        # Filter by date range
+        if not df.empty and 'timestamp' in df.columns:
+            if start_date:
+                df = df[df['timestamp'] >= start_date]
+            if end_date:
+                df = df[df['timestamp'] <= end_date]
+
+        # Filter by tickers if provided
+        if filter_tickers and 'ticker' in df.columns:
+            df = df[df['ticker'].isin(filter_tickers)]
+
+        return df
+
+    def _prefix_columns(
+        self,
+        df: pd.DataFrame,
+        prefix: str,
+        exclude: List[str]
+    ) -> pd.DataFrame:
+        """
+        Add prefix to all columns except excluded ones
+        
+        Args:
+            df: DataFrame to modify
+            prefix: Prefix to add (e.g., 'stock_', 'news_')
+            exclude: List of columns to exclude from prefixing
+            
+        Returns:
+            DataFrame with prefixed columns
+        """
+        df = df.copy()
+        rename_map = {
+            col: f"{prefix}{col}"
+            for col in df.columns
+            if col not in exclude
+        }
+        return df.rename(columns=rename_map)
+
+    def _join_all_sources(
+        self,
+        stock_df: pd.DataFrame,
+        news_df: pd.DataFrame,
+        macro_df: pd.DataFrame,
+        policy_df: pd.DataFrame
+    ) -> pd.DataFrame:
+        """
+        Join all data sources on ticker and timestamp
+        
+        Uses outer join to preserve all records; missing values filled with NaN
+        """
+        # Start with stock data as base (most frequent)
+        if not stock_df.empty:
+            result = stock_df.copy()
+        else:
+            result = pd.DataFrame()
+
+        # Join news data
+        if not news_df.empty:
+            if result.empty:
+                result = news_df.copy()
+            else:
+                result = pd.merge(
+                    result,
+                    news_df,
+                    on=['ticker', 'timestamp'],
+                    how='outer'
+                )
+
+        # Join macro data
+        if not macro_df.empty:
+            if result.empty:
+                result = macro_df.copy()
+            else:
+                result = pd.merge(
+                    result,
+                    macro_df,
+                    on=['ticker', 'timestamp'],
+                    how='outer'
+                )
+
+        # Join policy data
+        if not policy_df.empty:
+            if result.empty:
+                result = policy_df.copy()
+            else:
+                result = pd.merge(
+                    result,
+                    policy_df,
+                    on=['ticker', 'timestamp'],
+                    how='outer'
+                )
+
+        # Sort by ticker and timestamp for consistency
+        if not result.empty and 'ticker' in result.columns and 'timestamp' in result.columns:
+            result = result.sort_values(['ticker', 'timestamp']).reset_index(drop=True)
+            self.logger.info(f"Joined all sources: {len(result)} records")
+
+        return result
+
+    def _add_weekly_movement(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Add weekly stock movement calculations
+        
+        Calculates:
+        - stock_weekly_open_price: Opening price at start of week
+        - stock_weekly_close_price: Closing price at end of week
+        - stock_weekly_price_delta: Absolute price change (close - open)
+        - stock_weekly_price_return: Percentage return ((close - open) / open * 100)
+        - stock_weekly_movement_direction: 1 (up), -1 (down), 0 (flat)
+        """
+        if df.empty or 'ticker' not in df.columns or 'timestamp' not in df.columns:
+            self.logger.warning("Cannot calculate weekly movement: missing required columns")
+            return df
+        
+        df = df.copy()
+        
+        # Ensure timestamp is datetime
+        df['timestamp'] = pd.to_datetime(df['timestamp'])
+        
+        # Initialize weekly movement columns
+        df['stock_weekly_open_price'] = None
+        df['stock_weekly_close_price'] = None
+        df['stock_weekly_price_delta'] = None
+        df['stock_weekly_price_return'] = None
+        df['stock_weekly_movement_direction'] = None
+        
+        try:
+            # Group by ticker and week
+            df['year_week'] = (
+                df['timestamp'].dt.isocalendar().year.astype(str) + '-W' +
+                df['timestamp'].dt.isocalendar().week.astype(str).str.zfill(2)
+            )
+            
+            # Process each ticker separately
+            for ticker in df['ticker'].unique():
+                ticker_mask = df['ticker'] == ticker
+                
+                # Group by week for this ticker
+                for week_group, week_df in df[ticker_mask].groupby('year_week'):
+                    # Find opening price (first record of week)
+                    opening_price = None
+                    for col in ['stock_open', 'stock_price', 'stock_opening_price']:
+                        if col in week_df.columns:
+                            vals = week_df[col].dropna()
+                            if not vals.empty:
+                                opening_price = float(vals.iloc[0])
+                                break
+                    
+                    # Find closing price (last record of week)
+                    closing_price = None
+                    for col in ['stock_close', 'stock_price', 'stock_closing_price']:
+                        if col in week_df.columns:
+                            vals = week_df[col].dropna()
+                            if not vals.empty:
+                                closing_price = float(vals.iloc[-1])
+                                break
+                    
+                    # Calculate deltas if both prices available
+                    if opening_price is not None and closing_price is not None:
+                        try:
+                            price_delta = closing_price - opening_price
+                            price_return = (price_delta / opening_price * 100) if opening_price != 0 else 0
+                            direction = 1 if price_delta > 0 else (-1 if price_delta < 0 else 0)
+                            
+                            # Update all records in this week for this ticker
+                            week_indices = df[
+                                (df['ticker'] == ticker) & (df['year_week'] == week_group)
+                            ].index
+                            
+                            df.loc[week_indices, 'stock_weekly_open_price'] = opening_price
+                            df.loc[week_indices, 'stock_weekly_close_price'] = closing_price
+                            df.loc[week_indices, 'stock_weekly_price_delta'] = price_delta
+                            df.loc[week_indices, 'stock_weekly_price_return'] = price_return
+                            df.loc[week_indices, 'stock_weekly_movement_direction'] = direction
+                            
+                        except (ValueError, TypeError) as e:
+                            self.logger.debug(f"Error calculating weekly movement for {ticker} {week_group}: {e}")
+            
+            # Drop temporary week column
+            df = df.drop(columns=['year_week'])
+            self.logger.info("Added weekly movement features (stock_weekly_*)")
+            
+        except Exception as e:
+            self.logger.error(f"Error calculating weekly movements: {str(e)}")
+        
+        return df
 
     def _save_training_data(self, df: pd.DataFrame) -> str:
         """
@@ -553,77 +490,112 @@ class TrainingDataProcessor:
         Returns:
             Path to saved file
         """
-        # Create output directory
         os.makedirs(self.output_path, exist_ok=True)
 
         # Generate filename with timestamp
         timestamp = datetime.utcnow().strftime('%Y%m%d_%H%M%S')
         
         if self.output_format == 'csv':
-            filepath = os.path.join(self.output_path, f'training_data_{timestamp}.csv')
+            filepath = os.path.join(self.output_path, f'training_data_unified_{timestamp}.csv')
             df.to_csv(filepath, index=False)
             
         elif self.output_format == 'parquet':
-            filepath = os.path.join(self.output_path, f'training_data_{timestamp}.parquet')
+            filepath = os.path.join(self.output_path, f'training_data_unified_{timestamp}.parquet')
             df.to_parquet(filepath, index=False)
             
         elif self.output_format == 'json':
-            filepath = os.path.join(self.output_path, f'training_data_{timestamp}.json')
+            filepath = os.path.join(self.output_path, f'training_data_unified_{timestamp}.json')
             df.to_json(filepath, orient='records', date_format='iso')
             
         else:
             raise ValueError(f"Unsupported output format: {self.output_format}")
 
-        file_size = os.path.getsize(filepath) / (1024 * 1024)  # MB
-        self.logger.info(f"Saved training data to {filepath} ({file_size:.2f} MB)")
+        file_size = os.path.getsize(filepath) / (1024 * 1024)
+        self.logger.info(f"Saved unified training data to {filepath} ({file_size:.2f} MB)")
 
         return filepath
 
     def get_feature_summary(self, df: pd.DataFrame) -> Dict[str, Any]:
         """
-        Get summary statistics of training data
+        Get summary statistics of training data grouped by source
         
-        Args:
-            df: Training dataset
-            
-        Returns:
-            Dictionary with feature summary
+        Returns feature counts and types organized by data source
         """
+        if df.empty:
+            return {}
+
+        # Group columns by source
+        sources = {}
+        for col in df.columns:
+            if col in ['ticker', 'timestamp']:
+                continue
+            
+            source = col.split('_')[0]  # Extract source from prefix
+            if source not in sources:
+                sources[source] = []
+            sources[source].append(col)
+
         summary = {
             'total_records': len(df),
-            'total_features': len(df.columns),
+            'total_features': len(df.columns) - 2,  # Exclude ticker and timestamp
             'date_range': {
                 'start': str(df['timestamp'].min()) if 'timestamp' in df.columns else None,
                 'end': str(df['timestamp'].max()) if 'timestamp' in df.columns else None,
             },
-            'tickers': df['ticker'].unique().tolist() if 'ticker' in df.columns else [],
-            'missing_values': df.isnull().sum().to_dict(),
-            'data_types': df.dtypes.to_dict(),
-            'numeric_summary': df.describe().to_dict(),
+            'tickers': sorted(df['ticker'].unique().tolist()) if 'ticker' in df.columns else [],
+            'sources': {
+                source: {
+                    'feature_count': len(cols),
+                    'features': sorted(cols),
+                }
+                for source, cols in sorted(sources.items())
+            },
+            'missing_values_by_source': {
+                source: {
+                    col: int(df[col].isnull().sum())
+                    for col in cols
+                }
+                for source, cols in sources.items()
+            },
         }
 
         return summary
 
     def print_feature_summary(self, df: pd.DataFrame):
-        """Print formatted feature summary"""
+        """Print formatted feature summary organized by source"""
         summary = self.get_feature_summary(df)
         
+        if not summary:
+            print("No data to summarize")
+            return
+        
         print("\n" + "="*80)
-        print("TRAINING DATA SUMMARY")
+        print("UNIFIED TRAINING DATA SUMMARY")
         print("="*80)
         print(f"Total Records: {summary['total_records']}")
         print(f"Total Features: {summary['total_features']}")
         print(f"Tickers: {', '.join(summary['tickers'])}")
         print(f"Date Range: {summary['date_range']['start']} to {summary['date_range']['end']}")
         
-        print(f"\nFeature Columns:")
-        for col, dtype in summary['data_types'].items():
-            print(f"  - {col}: {dtype}")
+        print(f"\nFeatures by Source:")
+        for source in sorted(summary['sources'].keys()):
+            source_info = summary['sources'][source]
+            print(f"  {source.upper()}: {source_info['feature_count']} features")
+            for feature in sorted(source_info['features'])[:5]:  # Show first 5
+                print(f"    - {feature}")
+            if len(source_info['features']) > 5:
+                print(f"    ... and {len(source_info['features']) - 5} more")
         
-        print(f"\nMissing Values:")
-        for col, count in summary['missing_values'].items():
-            pct = (count / summary['total_records'] * 100) if summary['total_records'] > 0 else 0
-            if count > 0:
-                print(f"  - {col}: {count} ({pct:.2f}%)")
+        print(f"\nMissing Values by Source:")
+        for source in sorted(summary['missing_values_by_source'].keys()):
+            missing = summary['missing_values_by_source'][source]
+            missing_count = sum(missing.values())
+            if missing_count > 0:
+                pct = (missing_count / summary['total_records'] / len(missing) * 100)
+                print(f"  {source.upper()}: {missing_count} missing values ({pct:.1f}% avg)")
         
         print("="*80 + "\n")
+
+
+# Maintain backward compatibility
+TrainingDataProcessor = UnifiedTrainingDataProcessor

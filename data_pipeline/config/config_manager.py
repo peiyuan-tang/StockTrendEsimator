@@ -36,12 +36,12 @@ class DataPipelineConfig:
     mag7_tickers: list = None
     sp500_limit: int = 500
     
-    # Collection frequencies
-    financial_data_interval: int = 3600  # seconds
-    stock_movement_interval: int = 3600
-    news_interval: int = 3600
-    macro_interval: int = 86400  # daily
-    policy_interval: int = 604800  # weekly
+    # Collection frequencies (granularity: WEEKLY)
+    financial_data_interval: int = 604800  # seconds (1 week)
+    stock_movement_interval: int = 604800  # 1 week
+    news_interval: int = 604800  # 1 week
+    macro_interval: int = 604800  # 1 week (weekly macro collection)
+    policy_interval: int = 604800  # 1 week (weekly policy collection)
     
     # Storage
     data_root_path: str = '/data'
