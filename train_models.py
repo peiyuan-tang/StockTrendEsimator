@@ -141,6 +141,125 @@ class SimpleLSTM(nn.Module):
 
 
 # ==============================================================================
+# ATTENTION MODEL
+# ==============================================================================
+
+class AttentionLayer(nn.Module):
+    """Multi-head attention layer for sequence features"""
+    
+    def __init__(self, hidden_size, num_heads=4):
+        super(AttentionLayer, self).__init__()
+        self.hidden_size = hidden_size
+        self.num_heads = num_heads
+        self.head_dim = hidden_size // num_heads
+        
+        assert hidden_size % num_heads == 0, "hidden_size must be divisible by num_heads"
+        
+        self.query = nn.Linear(hidden_size, hidden_size)
+        self.key = nn.Linear(hidden_size, hidden_size)
+        self.value = nn.Linear(hidden_size, hidden_size)
+        self.fc_out = nn.Linear(hidden_size, hidden_size)
+    
+    def forward(self, query, key, value):
+        batch_size = query.shape[0]
+        
+        # Linear transformations
+        Q = self.query(query)
+        K = self.key(key)
+        V = self.value(value)
+        
+        # Reshape for multi-head attention
+        Q = Q.view(batch_size, -1, self.num_heads, self.head_dim).transpose(1, 2)
+        K = K.view(batch_size, -1, self.num_heads, self.head_dim).transpose(1, 2)
+        V = V.view(batch_size, -1, self.num_heads, self.head_dim).transpose(1, 2)
+        
+        # Attention scores
+        scores = torch.matmul(Q, K.transpose(-2, -1)) / np.sqrt(self.head_dim)
+        attention = torch.softmax(scores, dim=-1)
+        
+        # Apply attention to values
+        context = torch.matmul(attention, V)
+        
+        # Reshape back
+        context = context.transpose(1, 2).contiguous()
+        context = context.view(batch_size, -1, self.hidden_size)
+        
+        # Final linear transformation
+        output = self.fc_out(context)
+        
+        return output, attention
+
+
+class AttentionModel(nn.Module):
+    """Attention-based model for trend prediction"""
+    
+    def __init__(self, input_size, hidden_size=64, num_heads=4, num_classes=3, dropout=0.3):
+        super(AttentionModel, self).__init__()
+        self.input_size = input_size
+        self.hidden_size = hidden_size
+        
+        # Embedding layer
+        self.embedding = nn.Linear(input_size, hidden_size)
+        self.dropout = nn.Dropout(dropout)
+        
+        # Attention layers
+        self.attention1 = AttentionLayer(hidden_size, num_heads=num_heads)
+        self.attention2 = AttentionLayer(hidden_size, num_heads=num_heads)
+        
+        # Normalization
+        self.norm1 = nn.LayerNorm(hidden_size)
+        self.norm2 = nn.LayerNorm(hidden_size)
+        
+        # Feed-forward network
+        self.ffn = nn.Sequential(
+            nn.Linear(hidden_size, hidden_size * 2),
+            nn.ReLU(),
+            nn.Dropout(dropout),
+            nn.Linear(hidden_size * 2, hidden_size)
+        )
+        
+        # Classification head
+        self.fc1 = nn.Linear(hidden_size, 32)
+        self.fc2 = nn.Linear(32, num_classes)
+        self.relu = nn.ReLU()
+    
+    def forward(self, x):
+        # x shape: (batch_size, sequence_length, input_size) or (batch_size, input_size)
+        if x.dim() == 2:
+            # Add sequence dimension if not present
+            x = x.unsqueeze(1)
+        
+        batch_size = x.shape[0]
+        
+        # Embedding
+        x = self.embedding(x)  # (batch_size, seq_len, hidden_size)
+        x = self.dropout(x)
+        
+        # First attention block
+        attn_out1, attn_weights1 = self.attention1(x, x, x)
+        x = self.norm1(x + attn_out1)
+        
+        # Feed-forward
+        ffn_out = self.ffn(x)
+        x = self.norm2(x + ffn_out)
+        
+        # Second attention block
+        attn_out2, attn_weights2 = self.attention2(x, x, x)
+        x = x + attn_out2
+        
+        # Global average pooling
+        x = x.mean(dim=1)  # (batch_size, hidden_size)
+        
+        # Classification head
+        x = self.fc1(x)
+        x = self.relu(x)
+        x = self.dropout(x)
+        x = self.fc2(x)
+        
+        return x, attn_weights1
+
+
+# ==============================================================================
 # DUAL TOWER MODEL
 # ==============================================================================
 
