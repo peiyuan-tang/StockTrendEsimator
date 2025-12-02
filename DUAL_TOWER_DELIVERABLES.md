@@ -115,7 +115,7 @@
 - `DualTowerRelevanceModel`: Main model combining towers and heads
 
 **Factory Functions**:
-- `create_model()`: Create and initialize model
+- `create_dual_tower_model()`: Create and initialize model
 - `count_parameters()`: Count model parameters
 
 **Location**: `/StockTrendEsimator/data_pipeline/models/dual_tower_model.py`

@@ -1,14 +1,6 @@
-#!/usr/bin/env python3
-"""
-Dependencies and requirements for Stock Trend Estimator Data Pipeline
-"""
-
 # Core Dependencies
 pyyaml>=6.0                    # YAML configuration parsing
 python-daemon>=2.3.2          # Daemon process management
-
-# Flume Python Integration
-flume-ng-python>=1.9.0       # Flume Python SDK
 
 # Data Collection - Financial Data
 yfinance>=0.2.0              # Yahoo Finance API

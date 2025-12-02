@@ -334,11 +334,11 @@ processor = UnifiedTrainingDataProcessor(config)
 df = processor.generate_training_data(...)
 
 # Modelling module processes and trains on data
-from modelling import create_model, create_optimizer
-from modelling.ml_models import create_data_loaders
+from data_pipeline.models import create_dual_tower_model, create_dual_tower_optimizer
+from data_pipeline.models import create_dual_tower_data_loaders
 
-loaders = create_data_loaders(df, ...)
-model = create_model()
+loaders = create_dual_tower_data_loaders(df, ...)
+model = create_dual_tower_model()
 ...
 ```
 
