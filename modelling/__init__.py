@@ -1,59 +1,79 @@
 """
 Modelling Module - ML Model Training and Inference
 
-This module contains all machine learning models and training infrastructure,
-separated from the data pipeline for clear architectural separation.
+Refactored architecture organized by semantic/functional similarity:
 
-Submodules:
-- ml_models: Model implementations (dual-tower, LSTM, etc.)
-- configs: Model configurations and hyperparameters
+Subpackages:
+- architectures/: Model architecture definitions (dual_tower, lstm)
+- losses/: Loss function implementations (dual_tower, lstm)
+- data/: Data loading and preprocessing (dual_tower, lstm)
+- trainers/: Training loops and optimization (dual_tower, lstm)
+- configs/: Configuration management and hyperparameters
 
 Models:
 - DualTowerRelevanceModel: Context-stock relevance prediction
-- LSTMTrendPredictor: Time series trend forecasting with attention
+- LSTMRelevanceModel: Time series trend forecasting with LSTM
 """
 
 __version__ = "2.0"
 __author__ = "Stock Trend Estimator Team"
 
-# Dual-Tower imports
-from .ml_models import (
-    # Dual-Tower Model
-    DualTowerRelevanceModel,
+# Architecture imports (Model definitions)
+from .architectures import (
+    # Dual-Tower
     ContextTower,
     StockTower,
     RelevanceHead,
-    create_model,
-    count_parameters,
-    # Dual-Tower Loss
-    DualTowerLoss,
-    WeightedDualTowerLoss,
-    # Dual-Tower Training
-    DualTowerTrainer,
-    create_optimizer,
-    create_scheduler,
-    # Dual-Tower Data
-    DualTowerDataset,
-    DualTowerDataModule,
-    create_data_loaders,
-    # LSTM Model
-    LSTMTrendPredictor,
+    DualTowerRelevanceModel,
+    create_dual_tower_model,
+    count_dual_tower_parameters,
+    # LSTM
     LSTMEncoder,
-    AttentionLayer,
     PredictionHead,
+    LSTMRelevanceModel,
     create_lstm_model,
     count_lstm_parameters,
-    # LSTM Loss
-    LSTMLoss,
+)
+
+# Loss imports (Loss functions)
+from .losses import (
+    # Dual-Tower losses
+    RelevanceRegressionLoss,
+    RelevanceDirectionLoss,
+    TowerRegularizationLoss,
+    EmbeddingMagnitudeLoss,
+    DualTowerLoss,
+    WeightedDualTowerLoss,
+    # LSTM losses
+    LSTMRegressionLoss,
+    LSTMDirectionLoss,
+    LSTMSequenceLoss,
+    LSTMMultiTaskLoss,
     WeightedLSTMLoss,
-    # LSTM Training
+)
+
+# Data imports (Data loading and preprocessing)
+from .data import (
+    # Dual-Tower data
+    DualTowerDataset,
+    DualTowerDataModule,
+    create_dual_tower_data_loaders,
+    # LSTM data
+    LSTMDataset,
+    LSTMDataModule,
+    create_lstm_data_loaders,
+)
+
+# Trainer imports (Training loops and optimization)
+from .trainers import (
+    # Dual-Tower training
+    DualTowerTrainer,
+    create_dual_tower_optimizer,
+    create_dual_tower_scheduler,
+    # LSTM training
     LSTMTrainer,
     create_lstm_optimizer,
     create_lstm_scheduler,
-    # LSTM Data
-    LSTMSequenceDataset,
-    LSTMDataModule,
-    create_lstm_data_loaders,
 )
 
 from .configs import (
@@ -75,38 +95,73 @@ from .configs import (
 )
 
 __all__ = [
-    # Dual-Tower: Model architecture
+    # ==================== ARCHITECTURES ====================
+    # Dual-Tower architecture
     'DualTowerRelevanceModel',
     'ContextTower',
     'StockTower',
     'RelevanceHead',
-    'create_model',
-    'count_parameters',
-    # Dual-Tower: Loss functions
-    'DualTowerLoss',
-    'WeightedDualTowerLoss',
-    # Dual-Tower: Training
-    'DualTowerTrainer',
-    'create_optimizer',
-    'create_scheduler',
-    # Dual-Tower: Data loading
-    'DualTowerDataset',
-    'DualTowerDataModule',
-    'create_data_loaders',
-    # LSTM: Model architecture
-    'LSTMTrendPredictor',
+    'create_dual_tower_model',
+    'count_dual_tower_parameters',
+    # LSTM architecture
+    'LSTMRelevanceModel',
     'LSTMEncoder',
-    'AttentionLayer',
     'PredictionHead',
     'create_lstm_model',
     'count_lstm_parameters',
-    # LSTM: Loss functions
-    'LSTMLoss',
+    
+    # ==================== LOSS FUNCTIONS ====================
+    # Dual-Tower losses
+    'RelevanceRegressionLoss',
+    'RelevanceDirectionLoss',
+    'TowerRegularizationLoss',
+    'EmbeddingMagnitudeLoss',
+    'DualTowerLoss',
+    'WeightedDualTowerLoss',
+    # LSTM losses
+    'LSTMRegressionLoss',
+    'LSTMDirectionLoss',
+    'LSTMSequenceLoss',
+    'LSTMMultiTaskLoss',
     'WeightedLSTMLoss',
-    # LSTM: Training
+    
+    # ==================== DATA LOADING ====================
+    # Dual-Tower data
+    'DualTowerDataset',
+    'DualTowerDataModule',
+    'create_dual_tower_data_loaders',
+    # LSTM data
+    'LSTMDataset',
+    'LSTMDataModule',
+    'create_lstm_data_loaders',
+    
+    # ==================== TRAINING ====================
+    # Dual-Tower training
+    'DualTowerTrainer',
+    'create_dual_tower_optimizer',
+    'create_dual_tower_scheduler',
+    # LSTM training
     'LSTMTrainer',
     'create_lstm_optimizer',
     'create_lstm_scheduler',
+    
+    # ==================== CONFIGURATION ====================
+    # Dual-Tower config
+    'DualTowerModelConfig',
+    'TrainingConfig',
+    'DataConfig',
+    # LSTM config
+    'LSTMModelConfig',
+    'LSTMTrainingConfig',
+    'LSTMSequenceConfig',
+    # General
+    'ConfigManager',
+    'DEFAULT_MODEL_CONFIG',
+    'DEFAULT_TRAINING_CONFIG',
+    'DEFAULT_DATA_CONFIG',
+    'DEFAULT_LSTM_MODEL_CONFIG',
+    'DEFAULT_LSTM_TRAINING_CONFIG',
+]
     # LSTM: Data loading
     'LSTMSequenceDataset',
     'LSTMDataModule',
