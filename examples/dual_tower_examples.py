@@ -39,11 +39,13 @@ def example_1_basic_training():
     
     # Import components
     from data_pipeline.core.training_data import UnifiedTrainingDataProcessor
-    from data_pipeline.models.dual_tower_model import create_model
-    from data_pipeline.models.dual_tower_data import create_data_loaders
-    from data_pipeline.models.dual_tower_loss import DualTowerLoss
-    from data_pipeline.models.dual_tower_trainer import (
-        DualTowerTrainer, create_optimizer, create_scheduler
+    from modelling.ml_models import (
+        create_model,
+        create_data_loaders,
+        DualTowerLoss,
+        DualTowerTrainer,
+        create_optimizer,
+        create_scheduler,
     )
     
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
