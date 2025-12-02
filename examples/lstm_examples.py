@@ -39,7 +39,7 @@ def example_1_basic_lstm_training():
     logger.info("EXAMPLE 1: Basic LSTM Model Training")
     logger.info("=" * 80)
     
-    from modelling.ml_models import (
+    from data_pipeline.models import (
         create_lstm_model,
         create_lstm_data_loaders,
         LSTMLoss,
@@ -172,7 +172,7 @@ def example_2_attention_analysis():
     logger.info("EXAMPLE 2: Attention Weight Analysis")
     logger.info("=" * 80)
     
-    from modelling.ml_models import create_lstm_model, create_lstm_data_loaders
+    from data_pipeline.models import create_lstm_model, create_lstm_data_loaders
     
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     logger.info(f"Using device: {device}\n")
@@ -272,7 +272,7 @@ def example_3_multi_horizon_comparison():
     logger.info("EXAMPLE 3: Multi-Horizon Prediction Comparison")
     logger.info("=" * 80)
     
-    from modelling.ml_models import create_lstm_model, create_lstm_data_loaders
+    from data_pipeline.models import create_lstm_model, create_lstm_data_loaders
     
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     logger.info(f"Using device: {device}\n")
@@ -401,7 +401,7 @@ def example_4_inference():
     logger.info("EXAMPLE 4: Model Inference on New Data")
     logger.info("=" * 80)
     
-    from modelling.ml_models import create_lstm_model, create_lstm_data_loaders
+    from data_pipeline.models import create_lstm_model, create_lstm_data_loaders
     
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     logger.info(f"Using device: {device}\n")

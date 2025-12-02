@@ -39,13 +39,13 @@ def example_1_basic_training():
     
     # Import components
     from data_pipeline.core.training_data import UnifiedTrainingDataProcessor
-    from modelling.ml_models import (
-        create_model,
-        create_data_loaders,
+    from data_pipeline.models import (
+        create_dual_tower_model,
+        create_dual_tower_data_loaders,
         DualTowerLoss,
         DualTowerTrainer,
-        create_optimizer,
-        create_scheduler,
+        create_dual_tower_optimizer,
+        create_dual_tower_scheduler,
     )
     
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -64,7 +64,7 @@ def example_1_basic_training():
     
     # Step 2: Create data loaders
     logger.info("\nStep 2: Creating data loaders...")
-    train_loader, val_loader, test_loader = create_data_loaders(
+    train_loader, val_loader, test_loader = create_dual_tower_data_loaders(
         df,
         batch_size=32,
         normalize=True,
@@ -76,14 +76,14 @@ def example_1_basic_training():
     
     # Step 3: Create model
     logger.info("\nStep 3: Creating dual-tower model...")
-    model = create_model(device=device)
+    model = create_dual_tower_model(device=device)
     logger.info(f"  Model: DualTowerRelevanceModel")
     logger.info(f"  Total parameters: {sum(p.numel() for p in model.parameters())}")
     
     # Step 4: Create optimizer and scheduler
     logger.info("\nStep 4: Setting up optimizer and scheduler...")
-    optimizer = create_optimizer(model, learning_rate=0.001)
-    scheduler = create_scheduler(optimizer, total_epochs=50)
+    optimizer = create_dual_tower_optimizer(model, learning_rate=0.001)
+    scheduler = create_dual_tower_scheduler(optimizer, total_epochs=50)
     
     # Step 5: Create loss function
     logger.info("\nStep 5: Creating loss function...")

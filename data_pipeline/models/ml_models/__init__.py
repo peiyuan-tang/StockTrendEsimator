@@ -1,29 +1,23 @@
 """
-Modelling Module - UNIFIED WITH data_pipeline/models/ml_models
+ML Models Package - Unified Architecture
 
-⚠️ DEPRECATED: This package has been unified with data_pipeline/models/ml_models/
+Complete ML modeling suite organized by semantic function:
+- architectures/: Neural network models
+- losses/: Training loss functions  
+- data_loaders/: Data preprocessing and loading
+- trainers/: Training loops and optimization
+- model_configs.py: Configuration management
 
-For backward compatibility, this module re-exports from the unified location.
-All imports from this module are maintained for smooth migration.
-
-NEW RECOMMENDED IMPORTS:
-    from data_pipeline.models import DualTowerRelevanceModel
-    from data_pipeline.models.ml_models import ConfigManager
-
-OLD IMPORTS (STILL SUPPORTED):
-    from modelling import DualTowerRelevanceModel
-    from modelling import ConfigManager
+This package unifies the modelling and data_pipeline/models structure.
 """
 
 import sys
 from pathlib import Path
 
-# Add parent directories to path
-sys.path.insert(0, str(Path(__file__).parent.parent))
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-# Re-export from unified location
-from data_pipeline.models.ml_models import (
-    # Architectures
+# Architecture imports
+from .architectures import (
     ContextTower,
     StockTower,
     RelevanceHead,
@@ -35,7 +29,10 @@ from data_pipeline.models.ml_models import (
     LSTMRelevanceModel,
     create_lstm_model,
     count_lstm_parameters,
-    # Losses
+)
+
+# Loss imports
+from .losses import (
     RelevanceRegressionLoss,
     RelevanceDirectionLoss,
     TowerRegularizationLoss,
@@ -47,21 +44,30 @@ from data_pipeline.models.ml_models import (
     LSTMSequenceLoss,
     LSTMMultiTaskLoss,
     WeightedLSTMLoss,
-    # Data loaders
+)
+
+# Data loader imports
+from .data_loaders import (
     DualTowerDataset,
     DualTowerDataModule,
     create_dual_tower_data_loaders,
     LSTMDataset,
     LSTMDataModule,
     create_lstm_data_loaders,
-    # Trainers
+)
+
+# Trainer imports
+from .trainers import (
     DualTowerTrainer,
     create_dual_tower_optimizer,
     create_dual_tower_scheduler,
     LSTMTrainer,
     create_lstm_optimizer,
     create_lstm_scheduler,
-    # Configs
+)
+
+# Config imports
+from .model_configs import (
     DualTowerModelConfig,
     TrainingConfig,
     DataConfig,
@@ -77,78 +83,45 @@ from data_pipeline.models.ml_models import (
 )
 
 __all__ = [
-    # ==================== ARCHITECTURES ====================
-    # Dual-Tower architecture
-    'DualTowerRelevanceModel',
+    # Architectures
     'ContextTower',
     'StockTower',
     'RelevanceHead',
+    'DualTowerRelevanceModel',
     'create_dual_tower_model',
     'count_dual_tower_parameters',
-    # LSTM architecture
-    'LSTMRelevanceModel',
     'LSTMEncoder',
     'PredictionHead',
+    'LSTMRelevanceModel',
     'create_lstm_model',
     'count_lstm_parameters',
-    
-    # ==================== LOSS FUNCTIONS ====================
-    # Dual-Tower losses
+    # Losses
     'RelevanceRegressionLoss',
     'RelevanceDirectionLoss',
     'TowerRegularizationLoss',
     'EmbeddingMagnitudeLoss',
     'DualTowerLoss',
     'WeightedDualTowerLoss',
-    # LSTM losses
     'LSTMRegressionLoss',
     'LSTMDirectionLoss',
     'LSTMSequenceLoss',
     'LSTMMultiTaskLoss',
     'WeightedLSTMLoss',
-    
-    # ==================== DATA LOADING ====================
-    # Dual-Tower data
+    # Data loaders
     'DualTowerDataset',
     'DualTowerDataModule',
     'create_dual_tower_data_loaders',
-    # LSTM data
     'LSTMDataset',
     'LSTMDataModule',
     'create_lstm_data_loaders',
-    
-    # ==================== TRAINING ====================
-    # Dual-Tower training
+    # Trainers
     'DualTowerTrainer',
     'create_dual_tower_optimizer',
     'create_dual_tower_scheduler',
-    # LSTM training
     'LSTMTrainer',
     'create_lstm_optimizer',
     'create_lstm_scheduler',
-    
-    # ==================== CONFIGURATION ====================
-    # Dual-Tower config
-    'DualTowerModelConfig',
-    'TrainingConfig',
-    'DataConfig',
-    # LSTM config
-    'LSTMModelConfig',
-    'LSTMTrainingConfig',
-    'LSTMSequenceConfig',
-    # General
-    'ConfigManager',
-    'DEFAULT_MODEL_CONFIG',
-    'DEFAULT_TRAINING_CONFIG',
-    'DEFAULT_DATA_CONFIG',
-    'DEFAULT_LSTM_MODEL_CONFIG',
-    'DEFAULT_LSTM_TRAINING_CONFIG',
-]
-    # LSTM: Data loading
-    'LSTMSequenceDataset',
-    'LSTMDataModule',
-    'create_lstm_data_loaders',
-    # Configuration
+    # Configs
     'DualTowerModelConfig',
     'TrainingConfig',
     'DataConfig',
@@ -161,5 +134,4 @@ __all__ = [
     'DEFAULT_DATA_CONFIG',
     'DEFAULT_LSTM_MODEL_CONFIG',
     'DEFAULT_LSTM_TRAINING_CONFIG',
-]
 ]
