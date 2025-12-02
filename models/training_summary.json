@@ -1,0 +1,19 @@
+{
+  "timestamp": "2025-12-01T20:50:57.492103",
+  "training_data_path": "data_output/training_data_20241101-20241130.csv",
+  "validation_data_path": "data_output/validation_data_20241101-20241130.csv",
+  "training_samples": 23,
+  "validation_samples": 12,
+  "models": {
+    "lstm": {
+      "type": "SimpleLSTM",
+      "best_validation_accuracy": 33.333333333333336,
+      "checkpoint": "models/lstm_best.pth"
+    },
+    "dual_tower": {
+      "type": "DualTowerModel",
+      "best_validation_accuracy": 25.0,
+      "checkpoint": "models/dual_tower_best.pth"
+    }
+  }
+}
