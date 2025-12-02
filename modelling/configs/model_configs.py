@@ -1,10 +1,14 @@
 """
-Model Configurations for Dual-Tower Relevance Model
+Model Configurations for Stock Trend Prediction Models
 
-Centralized configuration for hyperparameters, architecture, and training settings.
+Centralized configuration for:
+- Dual-Tower Model (context + stock tower architecture)
+- LSTM Model (sequence-based time series prediction)
+
+Supports hyperparameter management, architecture configuration, and training settings.
 """
 
-from typing import Dict, Any
+from typing import Dict, Any, List
 from dataclasses import dataclass, field
 import yaml
 from pathlib import Path
@@ -208,10 +212,132 @@ class ConfigManager:
         return config_manager
 
 
+# ============================================================================
+# LSTM Model Configuration
+# ============================================================================
+
+@dataclass
+class LSTMEncoderConfig:
+    """Configuration for LSTM Encoder"""
+    input_dim: int = 62
+    hidden_dim: int = 128
+    num_layers: int = 2
+    dropout_rate: float = 0.2
+    bidirectional: bool = True
+
+
+@dataclass
+class AttentionConfig:
+    """Configuration for Attention Layer"""
+    hidden_dim: int = 128
+    num_heads: int = 4
+    dropout_rate: float = 0.1
+
+
+@dataclass
+class LSTMPredictionHeadConfig:
+    """Configuration for LSTM Prediction Head"""
+    input_dim: int = 128
+    hidden_dims: List[int] = field(default_factory=lambda: [64, 32])
+    output_dim: int = 3  # trend_score + 2 direction logits
+    dropout_rate: float = 0.2
+
+
+@dataclass
+class LSTMModelConfig:
+    """Complete configuration for LSTM Trend Predictor"""
+    input_dim: int = 62
+    hidden_dim: int = 128
+    num_lstm_layers: int = 2
+    num_attention_heads: int = 4
+    dropout_rate: float = 0.2
+    bidirectional: bool = True
+    head_hidden_dims: List[int] = field(default_factory=lambda: [64, 32])
+    
+    encoder: LSTMEncoderConfig = field(default_factory=LSTMEncoderConfig)
+    attention: AttentionConfig = field(default_factory=AttentionConfig)
+    prediction_head: LSTMPredictionHeadConfig = field(default_factory=LSTMPredictionHeadConfig)
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary"""
+        return {
+            'input_dim': self.input_dim,
+            'hidden_dim': self.hidden_dim,
+            'num_lstm_layers': self.num_lstm_layers,
+            'num_attention_heads': self.num_attention_heads,
+            'dropout_rate': self.dropout_rate,
+            'bidirectional': self.bidirectional,
+            'head_hidden_dims': self.head_hidden_dims,
+            'encoder': {
+                'input_dim': self.encoder.input_dim,
+                'hidden_dim': self.encoder.hidden_dim,
+                'num_layers': self.encoder.num_layers,
+                'dropout_rate': self.encoder.dropout_rate,
+                'bidirectional': self.encoder.bidirectional,
+            },
+            'attention': {
+                'hidden_dim': self.attention.hidden_dim,
+                'num_heads': self.attention.num_heads,
+                'dropout_rate': self.attention.dropout_rate,
+            }
+        }
+    
+    @classmethod
+    def from_dict(cls, config_dict: Dict[str, Any]) -> 'LSTMModelConfig':
+        """Create from dictionary"""
+        return cls(
+            input_dim=config_dict.get('input_dim', 62),
+            hidden_dim=config_dict.get('hidden_dim', 128),
+            num_lstm_layers=config_dict.get('num_lstm_layers', 2),
+            num_attention_heads=config_dict.get('num_attention_heads', 4),
+            dropout_rate=config_dict.get('dropout_rate', 0.2),
+            bidirectional=config_dict.get('bidirectional', True),
+            head_hidden_dims=config_dict.get('head_hidden_dims', [64, 32]),
+        )
+
+
+@dataclass
+class LSTMLossConfig:
+    """Configuration for LSTM Loss Function"""
+    regression_weight_7d: float = 1.0
+    classification_weight_7d: float = 0.5
+    regression_weight_30d: float = 1.0
+    classification_weight_30d: float = 0.5
+
+
+@dataclass
+class LSTMSequenceConfig:
+    """Configuration for LSTM Data Sequences"""
+    sequence_length: int = 12  # weeks
+    label_horizons: List[int] = field(default_factory=lambda: [7, 30])
+    normalize_features: bool = True
+    feature_scaler: str = 'standard'  # 'standard' or 'minmax'
+
+
+@dataclass
+class LSTMTrainingConfig:
+    """Complete training configuration for LSTM"""
+    batch_size: int = 32
+    epochs: int = 100
+    early_stopping_patience: int = 15
+    min_delta: float = 1e-4
+    max_grad_norm: float = 1.0
+    val_fraction: float = 0.15
+    test_fraction: float = 0.15
+    time_aware_split: bool = True
+    
+    loss: LSTMLossConfig = field(default_factory=LSTMLossConfig)
+    optimizer: OptimizerConfig = field(default_factory=OptimizerConfig)
+    scheduler: SchedulerConfig = field(default_factory=SchedulerConfig)
+    sequence: LSTMSequenceConfig = field(default_factory=LSTMSequenceConfig)
+
+
 # Default configurations
 DEFAULT_MODEL_CONFIG = DualTowerModelConfig()
 DEFAULT_TRAINING_CONFIG = TrainingConfig()
 DEFAULT_DATA_CONFIG = DataConfig()
+DEFAULT_LSTM_MODEL_CONFIG = LSTMModelConfig()
+DEFAULT_LSTM_TRAINING_CONFIG = LSTMTrainingConfig()
 
 if __name__ == '__main__':
     # Example usage
